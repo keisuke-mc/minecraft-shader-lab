@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Shader Lab — Minecraft シェーダープレビューア</title>
+<meta name="description" content="ブラウザ上で Minecraft のシェーダーパックを時間・天候を変えながら 3D プレビューできるツール">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='10' y='10' width='80' height='80' rx='14' fill='%2359c96a'/><rect x='10' y='10' width='80' height='30' rx='14' fill='%237a4a2b'/><rect x='16' y='16' width='14' height='14' rx='3' fill='%238fe08f'/><rect x='56' y='52' width='12' height='12' rx='2' fill='%23a5f2a5'/></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="glcanvas"></canvas>
+
+<!-- ===== UI オーバーレイ ===== -->
+<div id="ui">
+
+  <!-- ヘッダー -->
+  <header id="topbar">
+    <button id="panel-toggle" class="icon-btn" title="パネル開閉 (Tab)" aria-label="パネル開閉">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div id="brand">
+      <span class="brand-mark"></span>
+      <span id="brand-text">Shader&nbsp;Lab</span>
+      <span class="brand-sub">Minecraft シェーダープレビューア</span>
+    </div>
+    <div id="pack-chip" class="chip" title="読み込み済みシェーダーパック">内蔵: Soft Light</div>
+    <div class="topbar-actions">
+      <button id="btn-screenshot" class="icon-btn" title="スクリーンショット (P)">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
+      <button id="btn-fullscreen" class="icon-btn" title="フルスクリーン">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+      <button id="btn-help" class="icon-btn" title="ヘルプ / 使い方 (H)">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- 左コントロールパネル -->
+  <aside id="panel">
+
+    <section class="panel-sec" id="sec-pack">
+      <h2>シェーダーパック</h2>
+      <div class="row">
+        <select id="builtin-select" title="内蔵シェーダー">
+          <option value="softlight">内蔵: Soft Light（影・空・水面）</option>
+          <option value="vanilla">内蔵: バニラ風（素の描画）</option>
+        </select>
+      </div>
+      <div class="row btn-row">
+        <button id="btn-load-zip" class="btn">ZIP を読み込む</button>
+        <button id="btn-load-dir" class="btn">フォルダを読み込む</button>
+      </div>
+      <p class="hint">.zip をページにドラッグ＆ドロップでも OK。OptiFine 形式（shaders/ フォルダ）の簡易サブセット対応。</p>
+      <div class="row">
+        <button id="btn-program-status" class="btn ghost">プログラム状態を確認</button>
+      </div>
+      <input type="file" id="file-zip" accept=".zip" hidden>
+      <input type="file" id="file-dir" webkitdirectory directory multiple hidden>
+    </section>
+
+    <section class="panel-sec" id="sec-time">
+      <h2>時間 <span id="time-clock" class="val">12:00</span> <span id="time-tick" class="val dim">6000</span></h2>
+      <input type="range" id="time-slider" min="0" max="23999" step="1" value="6000" aria-label="ワールド時間（ティック）">
+      <div class="row preset-row">
+        <button class="btn sm preset" data-time="23000">夜明け</button>
+        <button class="btn sm preset" data-time="6000">昼</button>
+        <button class="btn sm preset" data-time="12500">夕焼け</button>
+        <button class="btn sm preset" data-time="18000">夜</button>
+      </div>
+      <div class="row toggle-row">
+        <label class="switch"><input type="checkbox" id="time-play" checked><span class="track"></span>時間の流れ</label>
+        <select id="time-speed" class="sel-sm" title="1日の長さ">
+          <option value="1200">1日 = 20分</option>
+          <option value="300">1日 = 5分</option>
+          <option value="120" selected>1日 = 2分</option>
+          <option value="30">1日 = 30秒</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="panel-sec" id="sec-weather">
+      <h2>天候</h2>
+      <div class="row seg" id="weather-seg">
+        <button class="seg-btn active" data-weather="clear">☀ 晴れ</button>
+        <button class="seg-btn" data-weather="rain">🌧 雨</button>
+        <button class="seg-btn" data-weather="thunder">⛈ 雷</button>
+      </div>
+      <div class="row">
+        <label class="slider-label">雨の強さ <span id="rain-val" class="val">0%</span></label>
+        <input type="range" id="rain-slider" min="0" max="100" step="1" value="0" aria-label="雨の強さ">
+      </div>
+    </section>
+
+    <section class="panel-sec" id="sec-camera">
+      <h2>カメラ</h2>
+      <div class="row seg" id="camera-seg">
+        <button class="seg-btn active" data-cam="orbit">🌐 旋回</button>
+        <button class="seg-btn" data-cam="fly">✈ 飛行</button>
+      </div>
+      <div class="row toggle-row">
+        <label class="switch"><input type="checkbox" id="auto-orbit" checked><span class="track"></span>自動旋回</label>
+        <button id="btn-reset-cam" class="btn sm">視点リセット</button>
+      </div>
+    </section>
+
+    <section class="panel-sec" id="sec-settings">
+      <h2>描画設定</h2>
+      <div class="row">
+        <label class="slider-label">フォグ距離 <span id="fog-val" class="val">130</span></label>
+        <input type="range" id="fog-slider" min="60" max="256" step="2" value="130" aria-label="フォグ距離">
+      </div>
+      <div class="row toggle-row">
+        <label class="switch"><input type="checkbox" id="shadow-on" checked><span class="track"></span>影</label>
+        <select id="shadow-res" class="sel-sm">
+          <option value="1024">影 1024²</option>
+          <option value="2048" selected>影 2048²</option>
+          <option value="4096">影 4096²</option>
+        </select>
+      </div>
+      <div class="row toggle-row">
+        <label class="switch"><input type="checkbox" id="res-scale-toggle"><span class="track"></span>解像度 50%</label>
+        <select id="res-scale" class="sel-sm">
+          <option value="0.5">50%</option>
+          <option value="0.75">75%</option>
+          <option value="1" selected>100%</option>
+        </select>
+      </div>
+      <div class="row toggle-row">
+        <label class="switch"><input type="checkbox" id="show-fps" checked><span class="track"></span>FPS 表示</label>
+      </div>
+    </section>
+
+    <section class="panel-sec" id="sec-debug">
+      <h2>デバッグ</h2>
+      <div class="row toggle-row">
+        <label class="switch"><input type="checkbox" id="bufview-on"><span class="track"></span>バッファビューア</label>
+        <select id="bufview-sel" class="sel-sm">
+          <option value="colortex0">colortex0</option>
+          <option value="colortex1">colortex1</option>
+          <option value="colortex2">colortex2</option>
+          <option value="colortex3">colortex3</option>
+          <option value="colortex4">colortex4</option>
+          <option value="colortex5">colortex5</option>
+          <option value="colortex6">colortex6</option>
+          <option value="colortex7">colortex7</option>
+          <option value="depthtex0">depthtex0</option>
+          <option value="depthtex1">depthtex1</option>
+          <option value="shadowtex0">shadowtex0</option>
+          <option value="shadowcolor0">shadowcolor0</option>
+          <option value="noisetex">noisetex</option>
+        </select>
+      </div>
+      <p class="hint">シェーダーの G-buffer やシャドウマップをそのまま確認できます。</p>
+    </section>
+
+    <footer class="panel-foot">
+      WebGL2 環境で動作 / GitHub Pages で公開可能
+    </footer>
+  </aside>
+
+  <!-- 統計チップ -->
+  <div id="stats-chip" class="chip">-- FPS</div>
+
+  <!-- 操作ヒント -->
+  <div id="controls-hint">
+    <span><b>ドラッグ</b> 視点</span>
+    <span><b>ホイール</b> ズーム</span>
+    <span><b>WASD</b> 移動</span>
+    <span><b>F</b> 飛行/旋回</span>
+    <button id="hint-close" title="閉じる">×</button>
+  </div>
+
+  <!-- トースト -->
+  <div id="toasts"></div>
+
+  <!-- バッファビューア -->
+  <div id="bufview" hidden>
+    <div class="bufview-head"><span id="bufview-label">colortex0</span><button id="bufview-close">×</button></div>
+    <div id="bufview-labels-uv">(0,1) ─ (1,1)</div>
+  </div>
+</div>
+
+<!-- ドラッグ＆ドロップ -->
+<div id="drop-overlay" hidden>
+  <div class="drop-box">📦 シェーダーパック (.zip) をドロップ</div>
+</div>
+
+<!-- ローディング -->
+<div id="loading-overlay">
+  <div class="loading-box">
+    <div class="loading-cube"><i></i><i></i><i></i><i></i></div>
+    <div id="loading-label">ワールド生成中…</div>
+    <div class="loading-bar"><div id="loading-fill"></div></div>
+  </div>
+</div>
+
+<!-- プログラム状態モーダル -->
+<dialog id="program-modal">
+  <div class="modal-head">
+    <h3>シェーダープログラム状態 <span id="pm-pack-name" class="val"></span></h3>
+    <button class="modal-close" data-close="program-modal">×</button>
+  </div>
+  <p class="hint" id="pm-summary"></p>
+  <div id="pm-list" class="pm-list"></div>
+</dialog>
+
+<!-- ヘルプモーダル -->
+<dialog id="help-modal">
+  <div class="modal-head">
+    <h3>🎮 Shader Lab の使い方</h3>
+    <button class="modal-close" data-close="help-modal">×</button>
+  </div>
+  <div class="help-body">
+    <h4>これは何？</h4>
+    <p>ブラウザ上で Minecraft のシェーダーパックをプレビューできるツールです。時間と天候を自由に変えながら、3D 視点移動で見て回れます。</p>
+    <h4>操作方法</h4>
+    <ul>
+      <li><b>視点回転</b>: マウスドラッグ（飛行モードはクリックでマウスロック）</li>
+      <li><b>移動</b>: WASD（飛行モード）/ Space=上 / Shift=下</li>
+      <li><b>ズーム</b>: ホイール</li>
+      <li><b>パネル開閉</b>: Tab キー</li>
+      <li><b>スクリーンショット</b>: P キー</li>
+      <li><b>カメラモード切替</b>: F キー</li>
+      <li><b>時間プリセット</b>: 1 夜明け / 2 昼 / 3 夕焼け / 4 夜</li>
+    </ul>
+    <h4>シェーダーパックの読み込み</h4>
+    <p>OptiFine / Iris 形式（<code>shaders/</code> フォルダ入り zip）を読み込めます。対応は<b>簡易サブセット</b>のため、複雑な大型パックは部分的に動作しないことがあります。失敗したプログラムは自動的に内蔵シェーダーへフォールバックします（「プログラム状態」で詳細を確認できます）。</p>
+    <h4>GitHub Pages での公開</h4>
+    <p>同梱の README.md に手順があります。zip を展開してリポジトリにコミットするだけで公開できます。</p>
+  </div>
+</dialog>
+
+<!-- デバッグコンソール (?debug=1) -->
+<div id="debug-console" hidden>
+  <div class="dbg-head">コンソール <button id="dbg-clear">クリア</button> <button id="dbg-toggle">−</button></div>
+  <div id="dbg-body"></div>
+</div>
+
+<script src="js/noise.js"></script>
+<script src="js/glutil.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/world.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/zipreader.js"></script>
+<script src="js/glsl_compat.js"></script>
+<script src="js/builtin_softlight.js"></script>
+<script src="js/builtin_vanilla.js"></script>
+<script src="js/packloader.js"></script>
+<script src="js/uniforms.js"></script>
+<script src="js/pipeline.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
