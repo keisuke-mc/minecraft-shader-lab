@@ -16,6 +16,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* hidden 属性は display 指定より必ず優先させる (オーバーレイ常時表示バグ対策) */
+[hidden] { display: none !important; }
+
 html, body {
   width: 100%; height: 100%;
   overflow: hidden;
@@ -285,7 +288,9 @@ input[type="range"]::-moz-range-thumb {
   background: rgba(6, 10, 14, 0.8);
   backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
+  pointer-events: none; /* 表示専用。ドロップ判定は window で受けるため操作は遮断しない */
 }
+#drop-overlay[hidden] { display: none; }
 .drop-box {
   font-size: 18px; font-weight: 700;
   padding: 48px 72px;
@@ -375,6 +380,8 @@ dialog::backdrop { background: rgba(4, 6, 9, 0.65); backdrop-filter: blur(3px); 
   max-height: 200px;
   overflow-y: auto;
 }
+.modal-foot { padding: 0 20px 16px; }
+.modal-foot .btn { width: 100%; }
 
 .help-body { padding: 0 22px 22px; font-size: 13px; line-height: 1.75; overflow-y: auto; max-height: 62vh; }
 .help-body h4 { font-size: 13px; color: var(--accent); margin: 15px 0 5px; }
