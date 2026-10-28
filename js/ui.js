@@ -192,22 +192,46 @@
     _drop() {
       const overlay = $('#drop-overlay');
       let depth = 0;
-      window.addEventListener('dragenter', (e) => { e.preventDefault(); depth++; overlay.hidden = false; });
-      window.addEventListener('dragleave', (e) => { e.preventDefault(); if (--depth <= 0) { depth = 0; overlay.hidden = true; } });
+      const fileDrag = (e) => {
+        try { return !!(e.dataTransfer && [...e.dataTransfer.types].includes('Files')); }
+        catch (err) { return false; }
+      };
+      const hide = () => { depth = 0; overlay.hidden = true; };
+      // ファイルを掴んだ時だけオーバーレイ表示 (テキスト選択ドラッグ等では出さない)
+      window.addEventListener('dragenter', (e) => {
+        if (!fileDrag(e)) return;
+        e.preventDefault();
+        depth++;
+        overlay.hidden = false;
+      });
+      window.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        // relatedTarget === null → ウィンドウ外へ出たので確実に閉じる
+        if (!e.relatedTarget) { hide(); return; }
+        // dataTransfer が読めない環境でも、カウントが合えば閉じる
+        if (depth > 0 && --depth <= 0) hide();
+      });
       window.addEventListener('dragover', (e) => e.preventDefault());
+      window.addEventListener('dragend', hide);
       window.addEventListener('drop', (e) => {
         e.preventDefault();
-        depth = 0; overlay.hidden = true;
-        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        hide();
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
         if (file) this.state.loadPackFile(file);
       });
     },
 
     // ---------- モーダル ----------
     _modals() {
-      document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => {
-        $('#' + b.dataset.close).close();
+      // ×ボタン・「閉じる」ボタン (data-close 属性で対象 dialog を閉じる)
+      document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => {
+        const d = $('#' + b.dataset.close);
+        if (d && d.open) d.close();
       }));
+      // 背面 (backdrop) クリックで閉じる
+      document.querySelectorAll('dialog').forEach(d => {
+        d.addEventListener('click', (e) => { if (e.target === d) d.close(); });
+      });
       $('#btn-program-status').addEventListener('click', () => this.showProgramStatus());
       $('#btn-load-zip').addEventListener('click', () => $('#file-zip').click());
       $('#btn-load-dir').addEventListener('click', () => $('#file-dir').click());

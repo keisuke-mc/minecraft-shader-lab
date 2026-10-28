@@ -85,7 +85,8 @@
       sel.value = '__loaded';
       SL.UI.setPackChip(name, errs > 0 || fbs > 0);
       SL.UI.toast(`${name}: ${status.length} プログラム (${errs} 失敗 / ${fbs} フォールバック)`, errs ? 'error' : 'ok');
-      SL.UI.showProgramStatus();
+      // 失敗・フォールバックがあるときだけモーダルを自動で開く (全成功時はシーンをすぐ見せる)
+      if (errs > 0 || fbs > 0) SL.UI.showProgramStatus();
       for (const d of parsed.diag) SL.UI.dbg('warn', d);
     },
 

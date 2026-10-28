@@ -260,7 +260,7 @@ void main() {
       const terrainOk = compiled['gbuffers_terrain'] && compiled['gbuffers_terrain'].ok;
       if (!terrainOk) {
         this.usingBuiltinFallback = true;
-        const bf = SL.parsePack({ files: builtinFiles }, 'fallback');
+        const bf = SL.parsePack(builtinFiles, 'fallback');
         for (const [name, src] of Object.entries(bf.programs)) {
           const c = this.compileOne(name, src.vsh, src.fsh, null, null);
           compiled[name] = c;
